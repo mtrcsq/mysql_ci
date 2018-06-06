@@ -1,0 +1,67 @@
+<project default="main" basedir="../../">
+   <taskdef resource="net/sf/antcontrib/antlib.xml">
+      <classpath>
+         <pathelement location="${basedir}/lib/ant-contrib-1.0b2.jar" />
+      </classpath>
+   </taskdef>
+   <taskdef name="staf" classname="com.ibm.staf.ant.taskdef.STAF" >
+      <classpath>
+         <pathelement location="${basedir}/lib/STAFAnt.jar" />
+      </classpath>
+   </taskdef>
+   <property file="${basedir}/src/conf/test.conf" /> 
+
+   <target name="main">
+      <antcall target="uninstall_mysql"/>
+      <antcallback target="ready_package" return="package_name"/>
+      <antcall target="install_mysql"/>
+      <antcall target="exec_testcase"/>
+   </target>
+
+   <target name="uninstall_mysql">
+      <staf location="local" service="PROCESS" 
+            request="START SHELL COMMAND ${INSTALL_DIR}/uninstall --mode unattended WAIT 10m RETURNSTDOUT RETURNSTDERR" 
+            throwBuildException="1"/>
+   </target>
+
+   <target name="install_mysql">
+      <staf location="local" service="PROCESS" 
+            request="START SHELL COMMAND chmod u+x ${CI_WORK_DIR}/${package_name} WAIT 10m RETURNSTDOUT RETURNSTDERR" 
+            throwBuildException="1"/>
+      <staf location="local" service="PROCESS" 
+            request="START SHELL COMMAND ${CI_WORK_DIR}/${package_name} --mode unattended WAIT 10m STDERRTOSTDOUT RETURNSTDOUT" 
+			resultPrefix="install"
+            throwBuildException="1"/>
+	  <propertyregex property="install_rc" input="${install.result}" regexp="Return\ Code:\ (.*)\n" select="\1"/>
+	  <if>
+	     <equals arg1="${install_rc}" arg2="0"/>
+		 <else>
+		    <fail message="exex: ${CI_WORK_DIR}/${package_name} --mode unattended, return code is not 0"/>
+		 </else>
+	  </if>
+   </target>
+
+   <target name="exec_testcase">
+      <var name="testscript_log" value="${CI_WORK_DIR}/normal_test.log"/>
+	  <staf location="local" service="FS" 
+	        request="DELETE ENTRY ${testscript_log} CONFIRM"/>
+      <var name="cmd" value="cd ${INSTALL_DIR}/mysql-test;./mtr --suites=${TESTCASE_LIST} --nocheck-testcases --force --xml-report=${WORKSPACE}/report/mysql_test_report.xml --parallel=4"/>
+      <staf location="local" service="PROCESS" 
+            request="START SHELL COMMAND ${cmd} STDOUTAPPEND ${testscript_log} STDERRTOSTDOUT WAIT" 
+            throwBuildException="1"/>
+   </target>
+
+   <target name="ready_package">
+      <property name="package_dir" location="${WORKSPACE}/archive/current"/>
+      <first id="package_fullname">
+         <fileset dir="${package_dir}" includes="sequoiasql-mysql*.run"/>
+      </first>
+	  <property name="package_fullname" location="${toString:package_fullname}"/>
+      <basename property="package_name_part" file="${package_fullname}" suffix=".run"/>
+      <property name="package_name" value="${package_name_part}.run"/>
+
+      <delete dir="${CI_WORK_DIR}" failonerror="false"/>
+      <mkdir dir="${CI_WORK_DIR}"/>
+      <copy file="${WORKSPACE}/archive/current/${package_name}" todir="${CI_WORK_DIR}"/>
+   </target>
+</project>

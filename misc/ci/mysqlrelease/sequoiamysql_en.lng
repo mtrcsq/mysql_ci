@@ -1,0 +1,18 @@
+
+install.para.user.title=Configure user information
+install.para.user.explanation=Please insert the desired username groupname and password
+install.para.user.username.description=User Name
+install.para.user.groupname.description=Group Name
+install.para.user.password.description=Password
+install.para.user.reentrypw.description=Re-enter
+
+install.show.checkinstalldir.text=An existing installation has been detected in ${installdir}. please uninstall the previous version before install!\n 
+
+install.warnmsg.checkumask=Umask abnormal! Current umask = ${full_mask}, recommended value is 0022
+
+install.errmsg.checkgroup=User ${username} exists, but it does not belong to group ${groupname}.
+install.errmsg.creategroup=Failed to create group ${groupname}.
+install.errmsg.createuser=Failed to create user ${username}.
+install.errmsg.deleteuser=Failed to delete user ${username}.
+install.errmsg.checkdisk=There is not enough disk space for installation, it needs 1G.
+
