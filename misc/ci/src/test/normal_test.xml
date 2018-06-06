@@ -43,15 +43,16 @@
    </target>
 	
    <target name="ready_testcase">
-      <copy todir="${INSTALL_DIR}/mysql_test/r">
-	     <fileset dir="${WORKSPACE}/r"/>
-	  </copy>
-      <copy todir="${INSTALL_DIR}/mysql_test/t">
-	     <fileset dir="${WORKSPACE}/t"/>
-	  </copy>
-      <copy todir="${INSTALL_DIR}/mysql_test/include">
-	     <fileset dir="${WORKSPACE}/include"/>
-	  </copy>
+      <hostinfo prefix="host"/>
+      <staf localtion="local" service="FS" 
+	        request="COPY DIRECTORY ${WORKSPACE}/r TODIRECTORY ${INSTALL_DIR}/mysql_test/r TOMACHINE ${host.NAME} RECURSE"
+			throwBuildException="1"/>
+      <staf localtion="local" service="FS" 
+	        request="COPY DIRECTORY ${WORKSPACE}/t TODIRECTORY ${INSTALL_DIR}/mysql_test/t TOMACHINE ${host.NAME} RECURSE"
+			throwBuildException="1"/>
+      <staf localtion="local" service="FS" 
+	        request="COPY DIRECTORY ${WORKSPACE}/include TODIRECTORY ${INSTALL_DIR}/mysql_test/include TOMACHINE ${host.NAME} RECURSE"
+			throwBuildException="1"/>
    </target>
 	
    <target name="exec_testcase">
