@@ -48,13 +48,13 @@
 	        request="DELETE ENTRY ${INSTALL_DIR}/mysql-test/t RECURSE CONFIRM" 
 			throwBuildException=""/>
       <staf location="local" service="FS" 
-	        request="COPY DIRECTORY ${WORKSPACE}/r TODIRECTORY ${INSTALL_DIR}/mysql_test/r TOMACHINE ${host.NAME} RECURSE"
+	        request="COPY DIRECTORY ${WORKSPACE}/r TODIRECTORY ${INSTALL_DIR}/}/mysql-test/r TOMACHINE ${host.NAME} RECURSE"
 			throwBuildException="1"/>
       <staf location="local" service="FS" 
-	        request="COPY DIRECTORY ${WORKSPACE}/t TODIRECTORY ${INSTALL_DIR}/mysql_test/t TOMACHINE ${host.NAME} RECURSE"
+	        request="COPY DIRECTORY ${WORKSPACE}/t TODIRECTORY ${INSTALL_DIR}/}/mysql-test/t TOMACHINE ${host.NAME} RECURSE"
 			throwBuildException="1"/>
       <staf location="local" service="FS" 
-	        request="COPY DIRECTORY ${WORKSPACE}/include TODIRECTORY ${INSTALL_DIR}/mysql_test/include TOMACHINE ${host.NAME} RECURSE"
+	        request="COPY DIRECTORY ${WORKSPACE}/include TODIRECTORY ${INSTALL_DIR}/}/mysql-test/include TOMACHINE ${host.NAME} RECURSE"
 			throwBuildException="1"/>
    </target>
 	
