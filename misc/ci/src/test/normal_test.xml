@@ -15,6 +15,7 @@
       <antcall target="uninstall_mysql"/>
       <antcallback target="ready_package" return="package_name"/>
       <antcall target="install_mysql"/>
+      <antcall target="ready_testcase"/>
       <antcall target="exec_testcase"/>
    </target>
 
@@ -40,7 +41,19 @@
 		 </else>
 	  </if>
    </target>
-
+	
+   <target name="ready_testcase">
+      <copy todir="${INSTALL_DIR}/mysql_test/r">
+	     <fileset dir="${WORKSPACE}/r"/>
+	  </copy>
+      <copy todir="${INSTALL_DIR}/mysql_test/t">
+	     <fileset dir="${WORKSPACE}/t"/>
+	  </copy>
+      <copy todir="${INSTALL_DIR}/mysql_test/include">
+	     <fileset dir="${WORKSPACE}/include"/>
+	  </copy>
+   </target>
+	
    <target name="exec_testcase">
       <var name="testscript_log" value="${CI_WORK_DIR}/normal_test.log"/>
 	  <staf location="local" service="FS" 
