@@ -66,6 +66,9 @@
       <staf location="local" service="PROCESS" 
             request="START SHELL COMMAND ${cmd} STDOUTAPPEND ${testscript_log} STDERRTOSTDOUT WAIT" 
             throwBuildException="1"/>
+      <staf location="local" service="FS" 
+            request="GET FILE ${testscript_log} TEXT" 
+            throwBuildException="1"/>
    </target>
 
    <target name="ready_package">
