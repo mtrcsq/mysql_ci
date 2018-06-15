@@ -18,7 +18,19 @@
             <file>${build_project_directory}/sequoiamysql_zh.lng</file>
         </language>
     </customLanguageFileList>
-
+    
+    <licenseFileList>
+        <licenseFile>
+            <code>en</code>
+            <file>${build_project_directory}/mysql/license/license_en.txt</file>
+        </licenseFile>
+        <licenseFile>
+            <code>zh_CN</code>
+            <encoding>utf-8</encoding>
+            <file>${build_project_directory}/mysql/license/license_zh.txt</file>
+        </licenseFile>
+    </licenseFileList>
+    
     <functionDefinitionList>
         <actionDefinition name="checkUmaskFunction">
             <actionList>
@@ -121,7 +133,54 @@
         <!--keep variable in both running time and building time-->          
         <stringParameter name="sql_type" ask="0" value=""/>
         
+        <choiceParameter name="need_read_license">
+            <ruleList>
+                <compareValues value1="${installer_ui}" logic="equals" value2="text"/>
+            </ruleList>
+            <insertBefore>full_license</insertBefore>
+            <default>false</default>
+            <cliOptionShow>0</cliOptionShow>
+            <explanation></explanation>
+            <description>${msg(install.para.licenseread.license.information.part)}</description>
+            <optionList>
+                <option>
+                    <text>${msg(install.para.licenseread.agree.description)}</text>
+                    <value>false</value>
+                    <description>${msg(install.para.licenseread.agree.explanation)}</description>
+                </option>
+                <option>
+                    <text>${msg(install.para.licenseread.read.description)}</text>
+                    <value>true</value>
+                </option>
+            </optionList>
+        </choiceParameter>
+
+        <licenseParameter name="full_license">
+            <ruleEvaluationLogic>or</ruleEvaluationLogic>
+            <ruleList>
+                <compareValues value1="${installer_ui}" logic="does_not_equal" value2="text"/>
+                <ruleGroup ruleEvaluationLogic="and">
+                    <ruleList>
+                        <compareValues value1="${installer_ui}" logic="equals" value2="text"/>
+                        <isTrue value="${need_read_license}"/>
+                    </ruleList>
+                </ruleGroup>
+            </ruleList>
+            <title>License Agreement</title>
+            <description>${msg(install.para.licenseread.read.description)}</description>
+            <explanation></explanation>
+            <file>${build_project_directory}/mysql/license/license_en.txt</file>
+            <licenseFileList>
+                <licenseFile>
+                    <code>zh_CN</code>
+                    <encoding>utf-8</encoding>
+                    <file>${build_project_directory}/mysql/license/license_zh.txt</file>
+                </licenseFile>
+            </licenseFileList>
+        </licenseParameter>
+        
         <directoryParameter name="installdir">
+            <insertAfter>full_license</insertAfter>
             <description>Installer.Parameter.installdir.description</description>
             <explanation>Installer.Parameter.installdir.explanation</explanation>
             <value></value>
@@ -356,12 +415,30 @@
         <!--write /etc/default/sequoiasql-mysql-->
         <deleteFile path="${sys_conf_file}"/>
         <touchFile path="${sys_conf_file}"/>
+        <setInstallerVariable name="md5_info_file" value="${installdir}/checksum.md5"/>
+        <setInstallerVariable name="version_info_file" value="${installdir}/version.info"/>
+        <deleteFile path="${md5_info_file}"/>
+        <touchFile path="${md5_info_file}"/>
+        <changeOwnerAndGroup>
+            <files>${md5_info_file}</files>
+            <group>${groupname}</group>
+            <owner>${username}</owner>
+        </changeOwnerAndGroup>
+        <deleteFile path="${version_info_file}"/>
+        <touchFile path="${version_info_file}"/>
+        <changeOwnerAndGroup>
+            <files>${version_info_file}</files>
+            <group>${groupname}</group>
+            <owner>${username}</owner>
+        </changeOwnerAndGroup>
         <setInstallerVariable name="add_sysconf_done" value="true">
              <ruleList>
                  <compareText logic="equals" text="${program_exit_code}" value="0"/>
              </ruleList>
         </setInstallerVariable>
         <addFilesToUninstaller files="${sys_conf_file}"/>
+        <addFilesToUninstaller files="${md5_info_file}"/>
+        <addFilesToUninstaller files="${version_info_file}"/>
         <changePermissions files="${sys_conf_file}" permissions="0644"/>
         <propertiesFileSet>
             <file>${sys_conf_file}</file>
@@ -389,7 +466,14 @@
             <key>MD5</key>
             <value>${md5sum}</value>
         </propertiesFileSet>
-
+        <addTextToFile>
+            <file>${md5_info_file}</file>
+            <text>${md5sum}</text>
+        </addTextToFile>
+        <addTextToFile>
+            <file>${version_info_file}</file>
+            <text>${product_version}</text>
+        </addTextToFile>
     </postInstallationActionList>
 
     <installationAbortedActionList>
