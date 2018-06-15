@@ -192,12 +192,12 @@
       <attribute name="version"/>
       <sequential>
          <var name="@{verison}" unset="true"/>
-         <exec executable="bash" dir="@{dir}" outputproperty="@{version}" failonerror="true" logError="true" >
-            <arg value="-c" />
-            <arg line="&quot;svn info | grep Revision | awk '{print $2}'&quot;" />
+         <exec executable="git" dir="@{dir}" outputproperty="@{version}" failonerror="true" logError="true" >
+            <arg line="rev-parse HEAD" />
          </exec>
       </sequential>
    </macrodef>
+
    
    <macrodef name="dbversion">
       <attribute name="srccodedir"/>
