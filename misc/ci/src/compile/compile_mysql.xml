@@ -148,7 +148,7 @@
       </exec>
       
       <copy todir="${mysqltarget}">
-        <fileset dir="${srccode_dir}/misc/ci/mysqlrelease" include="license/*"/>
+        <fileset dir="${srccode_dir}/misc/ci/mysqlrelease" includes="license/*"/>
       </copy>
       
    </target>
