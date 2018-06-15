@@ -62,7 +62,7 @@
       <var name="testscript_log" value="${CI_WORK_DIR}/normal_test.log"/>
 	  <staf location="local" service="FS" 
 	        request="DELETE ENTRY ${testscript_log} CONFIRM"/>
-      <var name="cmd" value="cd ${INSTALL_DIR}/mysql-test;./mtr --suite=${TESTCASE_LIST} --nocheck-testcases --force --xml-report=${WORKSPACE}/report/mysql_test_report.xml --parallel=4"/>
+      <var name="cmd" value="cd ${INSTALL_DIR}/mysql-test;./mtr --suite=${TESTCASE_LIST} --big-test --nocheck-testcases --force --xml-report=${WORKSPACE}/report/mysql_test_report.xml --parallel=4"/>
       <staf location="local" service="PROCESS" 
             request="START SHELL COMMAND ${cmd} STDOUTAPPEND ${testscript_log} STDERRTOSTDOUT WAIT" 
             throwBuildException="1"/>
