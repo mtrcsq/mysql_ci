@@ -147,6 +147,9 @@
          <arg line=" install " />
       </exec>
       
+      <copy todir="${mysqltarget}">
+        <fileset dir="${srccode_dir}/misc/ci/mysqlrelease" include="license/*"/>
+      </copy>
       
    </target>
    
