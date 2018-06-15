@@ -5,6 +5,10 @@ install.para.user.username.description=用户名
 install.para.user.groupname.description=用户组
 install.para.user.password.description=密码
 install.para.user.reentrypw.description=确认密码
+install.para.licenseread.read.description=查看详细的协议内容
+install.para.licenseread.agree.description=同意以上协议
+install.para.licenseread.agree.explanation=了解更多的协议内容，可以在安装后查看协议文件
+install.para.licenseread.license.information.part=GNU 通用公共授权\n第二版, 1991年6月\n著作权所有 (C) 1989，1991 Free Software Foundation, Inc. 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.\n允许每个人复制和发布本授权文件的完整副本，但不允许对它进行任何修改。
 
 install.show.checkinstalldir.text=检测到${installdir}下已有安装版本，请先卸载再安装\n
 
