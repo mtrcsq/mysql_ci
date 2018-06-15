@@ -5,6 +5,11 @@ install.para.user.username.description=User Name
 install.para.user.groupname.description=Group Name
 install.para.user.password.description=Password
 install.para.user.reentrypw.description=Re-enter
+install.para.licenseread.read.description=Read The License
+install.para.licenseread.agree.description=Agree The License
+install.para.licenseread.agree.explanation=For More License's Detail, Please Check The License File After Installation
+install.para.licenseread.license.information.part=GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\nCopyright (C) 1989, 1991 Free Software Foundation, Inc.,\n51 Franklin\nStreet, Fifth Floor, Boston, MA 02110-1301 USA\nEveryone is permitted to copy and distribute verbatim copies\nof this license document, but changing it is not allowed.
+
 
 install.show.checkinstalldir.text=An existing installation has been detected in ${installdir}. please uninstall the previous version before install!\n 
 
