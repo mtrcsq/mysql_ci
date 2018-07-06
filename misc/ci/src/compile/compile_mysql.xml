@@ -127,10 +127,10 @@
       <if>
          <equals arg1="${IS_DEBUG}" arg2="true"/>
          <then>
-            <var name="cmd" value=". -DWITH_BOOST=${MYSQL_BOOST_DIR}/boost_1_59_0/ -DCMAKE_INSTALL_PREFIX=${mysqltarget} -DMYSQL_DATADIR=${mysqltarget}/data -DCMAKE_BUILD_TYPE=Debug -DSDB_VER=${tmp_sdb_version}_${fdw_svn}"/>
+            <var name="cmd" value=". -DWITH_BOOST=${MYSQL_BOOST_DIR}/boost_1_59_0/ -DWITH_SDB_DRIVER=/opt/mysql-5.7.18/storage/sequoiadb/sequoiadb -DCMAKE_INSTALL_PREFIX=${mysqltarget} -DMYSQL_DATADIR=${mysqltarget}/data -DCMAKE_BUILD_TYPE=Debug -DSDB_VER=${tmp_sdb_version}_${fdw_svn}"/>
          </then>
          <else>
-            <var name="cmd" value=". -DWITH_BOOST=${MYSQL_BOOST_DIR}/boost_1_59_0/ -DCMAKE_INSTALL_PREFIX=${mysqltarget} -DMYSQL_DATADIR=${mysqltarget}/data -DCMAKE_BUILD_TYPE=Release -DSDB_VER=${tmp_sdb_version}_${fdw_svn}"/>
+            <var name="cmd" value=". -DWITH_BOOST=${MYSQL_BOOST_DIR}/boost_1_59_0/ -DWITH_SDB_DRIVER=/opt/mysql-5.7.18/storage/sequoiadb/sequoiadb -DCMAKE_INSTALL_PREFIX=${mysqltarget} -DMYSQL_DATADIR=${mysqltarget}/data -DCMAKE_BUILD_TYPE=Release -DSDB_VER=${tmp_sdb_version}_${fdw_svn}"/>
          </else>
       </if>
       <echo>cmake ${cmd} in dir ${MYSQL_SRCCODE}</echo>
