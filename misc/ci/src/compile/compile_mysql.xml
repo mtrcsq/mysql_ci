@@ -27,6 +27,7 @@
          </else>
       </if>
       <antcall target="compile_mysql"/>
+      <antcall target="copy_package"/>
       <antcall target="build_run_package"/>
    </target>
    
@@ -89,7 +90,7 @@
                <fileset dir="${CI_WORK_DIR}/C&amp;CPP-${tmp_sdb_version}-linux_x86_64" includes="include/**/**" />
             </copy>
             <copy todir="${MYSQL_SRCCODE}/storage/sequoiadb/sequoiadb/lib">
-               <fileset dir="${CI_WORK_DIR}/C&amp;CPP-${tmp_sdb_version}-linux_x86_64/lib" includes="libstaticsdbcpp.a" />
+               <fileset dir="${CI_WORK_DIR}/C&amp;CPP-${tmp_sdb_version}-linux_x86_64/lib" includes="libsdbcpp.so" />
             </copy>
          </then>
          <else>
@@ -97,6 +98,37 @@
          </else>
       </if>
    </target>
+   
+ <target name="copy_package">
+      <var name="mysqltarget" value="/opt/sequoiasql/mysql"/>
+      <if>
+         <equals arg1="${SDB_VERSION}" arg2=""/>
+         <then>
+           <dbversion srccodedir="${srccode_dir}" version="sequoiadb_version"/>
+            <var name="tmp_sdb_version" value="${sequoiadb_version}"/>
+         </then>
+         <else>
+            <var name="tmp_sdb_version" value="${SDB_VERSION}"/>
+         </else>
+      </if>
+            <propertyregex property="dbversionpre" input="${tmp_sdb_version}" regexp="([0-9]*\d.[0-9]*\d)(.*)" select="\1" casesensitive="false"/>
+            <delete dir="${CI_WORK_DIR}" failonerror="false"/>
+            <mkdir dir="${CI_WORK_DIR}"/>
+            <var name="driver_src_dir" value="${DB_PACKAGE_DIR}/SequoiaDB/SequoiaDB ${dbversionpre}/x86_64/driver-${tmp_sdb_version}"/>
+            <staf location="local" service="FS"
+                  request="COPY FILE ${driver_src_dir}/C&amp;CPP-${tmp_sdb_version}-linux_x86_64.tar.gz TODIRECTORY ${CI_WORK_DIR} TOMACHINE local"
+                  throwBuildException="1"/>
+
+            <exec executable="tar" dir="${CI_WORK_DIR}" failonerror="true" logError="true">
+               <arg line=" -zxvf ${CI_WORK_DIR}/C&amp;CPP-${tmp_sdb_version}-linux_x86_64.tar.gz " />
+            </exec>
+
+            
+            <copy todir="${mysqltarget}/lib">
+               <fileset dir="${CI_WORK_DIR}/C&amp;CPP-${tmp_sdb_version}-linux_x86_64/lib" includes="libsdbcpp.so" />
+            </copy>
+   </target>
+
    
    <target name="compile_mysql">
       <var name="mysqltarget" value="/opt/sequoiasql/mysql"/>
