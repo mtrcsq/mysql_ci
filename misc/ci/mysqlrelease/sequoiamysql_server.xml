@@ -80,6 +80,214 @@
             </actionList>
         </actionDefinition>
    
+        <actionDefinition name="getSysType">
+            <actionList>
+                <getSymLinkTarget variable="pid1_fullpath">
+                    <link>/proc/1/exe</link>
+                </getSymLinkTarget>
+                <setInstallerVariableFromRegEx>
+                    <name>pid1_exe</name>
+                    <pattern>(.*)/(.*)</pattern>
+                    <substitution>\2</substitution>
+                    <text>${pid1_fullpath}</text>
+                </setInstallerVariableFromRegEx>
+                <globalVariables names="${type}"/>
+                <setInstallerVariable name="${type}" value="unknown"/>
+                <setInstallerVariable name="${type}" value="SysV">
+                    <ruleList>
+                        <compareValues value1="${pid1_exe}" logic="equals" value2="init"/>
+                    </ruleList>
+                </setInstallerVariable>
+                <setInstallerVariable name="${type}" value="systemd">
+                    <ruleList>
+                        <compareValues value1="${pid1_exe}" logic="equals" value2="systemd"/>
+                    </ruleList>
+                </setInstallerVariable>
+            </actionList>
+                <parameterList>
+                    <stringParameter name="type" value="" default=""/>
+                </parameterList>
+        </actionDefinition>
+   
+        <actionDefinition name="deleteEnv">
+            <actionList>
+                <!--delete export line-->
+                <setInstallerVariableFromScriptOutput>
+                    <exec>grep</exec>
+                    <execArgs>-n "^export PATH=\"\$PATH:${installdir}\/bin\"$" ${envFile} | awk -F ":" '{print $1}'</execArgs>
+                    <name>line_num1</name>
+                </setInstallerVariableFromScriptOutput>
+                <runProgram>
+                    <program>sed</program>
+                    <programArguments>-i '${line_num1}d' ${envFile}</programArguments>
+                    <ruleList>
+                        <compareValues value1="${line_num1}" logic="greater" value2="0"/>
+                    </ruleList>
+                </runProgram>
+                <setInstallerVariableFromScriptOutput>
+                    <exec>grep</exec>
+                    <execArgs>-n "^export LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:${installdir}\/lib\"$" ${envFile} | awk -F ":" '{print $1}'</execArgs>
+                    <name>line_num2</name>
+                </setInstallerVariableFromScriptOutput>
+                <runProgram>
+                    <program>sed</program>
+                    <programArguments>-i '${line_num2}d' ${envFile}</programArguments>
+                    <ruleList>
+                        <compareValues value1="${line_num2}" logic="greater" value2="0"/>
+                    </ruleList>
+                </runProgram>
+                <!--delete empty file-->
+                <runProgram>
+                    <program>test</program>
+                    <programArguments>-s ${envFile}</programArguments>
+                    <abortOnError>0</abortOnError>
+                    <showMessageOnError>0</showMessageOnError>
+                    <onErrorActionList>
+                        <deleteFile path="${envFile}"/>
+                    </onErrorActionList>
+                </runProgram>
+            </actionList>
+            <parameterList>
+                <stringParameter name="envFile" value="" default=""/>
+            </parameterList>
+        </actionDefinition>
+   
+        <actionDefinition name="addEnv">
+            <actionList>
+                <runProgram>
+                    <program>grep</program>
+                    <programArguments>-q "^export PATH=\"\$PATH:${installdir}\/bin\"$" ${envFile}</programArguments> 
+                    <abortOnError>0</abortOnError>
+                    <showMessageOnError>0</showMessageOnError>
+                </runProgram>
+                <runProgram>
+                    <abortOnError>0</abortOnError>
+                    <program>echo</program>
+                    <programArguments>"export PATH=\"\$PATH:${installdir}/bin\"" &gt;&gt; ${envFile}</programArguments>
+                    <ruleList>
+                        <compareText logic="does_not_equal" text="${program_exit_code}" value="0"/>
+                    </ruleList>
+                </runProgram>
+                <runProgram>
+                    <program>grep</program>
+                    <programArguments>-q "^export LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:${installdir}\/lib\"$" ${envFile}</programArguments> 
+                    <abortOnError>0</abortOnError>
+                    <showMessageOnError>0</showMessageOnError>
+                </runProgram>
+                <runProgram>
+                    <abortOnError>0</abortOnError>
+                    <program>echo</program>
+                    <programArguments>"export LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:${installdir}/lib\"" &gt;&gt; ${envFile}</programArguments>
+                    <ruleList>
+                        <compareText logic="does_not_equal" text="${program_exit_code}" value="0"/>
+                    </ruleList>
+                </runProgram>
+            </actionList>
+            <parameterList>
+                <stringParameter name="envFile" value="" default=""/>
+            </parameterList>
+        </actionDefinition>
+   
+        <actionDefinition name="delDefaultService">
+            <actionList>
+                <removeUnixService name="${service_name}"/>
+            </actionList>
+        </actionDefinition>
+        
+        <actionDefinition name="delSystemdService">
+            <actionList>
+                <runProgram>
+                    <program>systemctl</program>
+                    <programArguments>disable ${service_name}.service</programArguments>
+                    <abortOnError>0</abortOnError>
+                    <showMessageOnError>0</showMessageOnError>
+                </runProgram>
+                <deleteFile path="${newsysconf_default}/${service_name}.service"/>
+                <deleteFile path="${newsysconf_ubuntu}/${service_name}.service"/>
+                <runProgram>
+                    <program>systemctl</program>
+                    <programArguments>daemon-reload</programArguments>
+                    <customErrorMessage>${msg(install.errmsg.systemctlreload)}</customErrorMessage>
+                </runProgram>
+            </actionList>
+        </actionDefinition>
+
+        <actionDefinition name="startServiceFunction">
+            <actionList>
+                <runProgram><!--in case did not reload /etc/init.d/${service_name} -->
+                    <abortOnError>0</abortOnError>
+                    <showMessageOnError>0</showMessageOnError>
+                    <program>systemctl</program>
+                    <programArguments>daemon-reload</programArguments>
+                </runProgram>
+                <runProgram>
+                    <customErrorMessage>${msg(install.errmsg.startservice)}</customErrorMessage>
+                    <program>service</program>
+                    <programArguments>${service_name} start</programArguments>
+                    <onErrorActionList>
+                        <consoleWrite text="&#xA;error message:&#xA;${program_stdout}&#xA;"/>
+                    </onErrorActionList>
+                </runProgram>
+            </actionList>
+        </actionDefinition>
+        
+        <actionDefinition name="addDefaultService">
+            <actionList>
+                <addUnixService>
+                    <customErrorMessage>${msg(install.errmsg.addservice)}</customErrorMessage>
+                    <name>${service_name}</name>
+                    <program>${installdir}/bin/sequoiasql-mysql.sysv</program>
+                </addUnixService>
+                <deleteFile path="${installdir}/bin/sequoiasql-mysql.systemd"/>
+            </actionList>
+        </actionDefinition>
+        
+        <actionDefinition name="addSystemdService">
+            <actionList>
+                <substitute>
+                    <files>${installdir}/bin/sequoiasql-mysql.systemd</files>
+                    <type>exact</type>
+                    <substitutionList>
+                        <substitution pattern="/opt/sequoiasql/mysql" value="${installdir}"/>
+                        <substitution pattern="XXXX" value="${username}"/>
+                    </substitutionList>
+                </substitute>
+                <copyFile origin="${installdir}/bin/sequoiasql-mysql.systemd">
+                    <destination>${newsysconf_default}/${service_name}.service</destination>
+                    <ruleList>
+                        <fileTest condition="is_not_empty" path="${newsysconf_default}"/>
+                    </ruleList>
+                </copyFile>
+                <copyFile origin="${installdir}/bin/sequoiasql-mysql.systemd">
+                    <destination>${newsysconf_ubuntu}/${service_name}.service</destination>
+                    <ruleList>
+                        <fileTest condition="is_not_empty" path="${newsysconf_ubuntu}"/>
+                    </ruleList>
+                </copyFile>
+                <deleteFile path="${installdir}/bin/sequoiasql-mysql.sysv"/>
+                <runProgram>
+                    <program>systemctl</program>
+                    <programArguments>daemon-reload</programArguments>
+                    <customErrorMessage>${msg(install.errmsg.systemctlreload)}</customErrorMessage>
+                </runProgram>
+                <runProgram>
+                    <program>systemctl</program>
+                    <programArguments>enable ${service_name}.service</programArguments>
+                    <customErrorMessage>${msg(install.errmsg.addservice)}</customErrorMessage>
+                </runProgram>
+            </actionList>
+        </actionDefinition> 
+
+        <actionDefinition name="addDefaultInstance">
+           <actionList>
+               <runProgram>
+                   <program>${installdir}/bin/sdb_mysql_ctl</program>
+                   <programArguments>addinst ${port} -d ${datadir}</programArguments>
+                   <customErrorMessage>${msg(install.errmsg.addinst)}</customErrorMessage>
+               </runProgram>
+           </actionList>
+        </actionDefinition>        
+   
    </functionDefinitionList>
 
     <initializationActionList>
@@ -92,7 +300,11 @@
         <setInstallerVariable name="add_user_done"                   value="false"/>
         <setInstallerVariable name="add_group_done"                  value="false"/>
         <setInstallerVariable name="add_sysconf_done"                value="false"/>
-        <setInstallerVariable name="exist_installinfo"      value="false"/>
+        <setInstallerVariable name="exist_installinfo"               value="false"/>
+        <setInstallerVariable name="newsysconf_default"              value="/usr/lib/systemd/system" persist="1"/>
+        <setInstallerVariable name="newsysconf_ubuntu"               value="/lib/systemd/system" persist="1"/>
+        <setInstallerVariable name="service_name"                    value="sequoiasql-mysql"/>
+        
     </initializationActionList>
     
     <preInstallationActionList>
@@ -101,6 +313,21 @@
         <setInstallerVariable name="parameter(installdir).ask" value="0">
             <ruleList>
                 <compareText text="${installer_command_line_arguments}" value="--prefix" logic="contains"/>
+            </ruleList>
+        </setInstallerVariable>
+        <setInstallerVariable name="parameter(installInstance).ask" value="0">
+            <ruleList>
+                <compareText text="${installer_command_line_arguments}" value="--installInstance" logic="contains"/>
+            </ruleList>
+        </setInstallerVariable>
+        <setInstallerVariable name="parameter(port).ask" value="0">
+            <ruleList>
+                <compareText text="${installer_command_line_arguments}" value="--port" logic="contains"/>
+            </ruleList>
+        </setInstallerVariable>
+        <setInstallerVariable name="parameter(datadir).ask" value="0">
+            <ruleList>
+                <compareText text="${installer_command_line_arguments}" value="--datadir" logic="contains"/>
             </ruleList>
         </setInstallerVariable>
         <setInstallerVariable name="parameter(user_data).parameter(username).ask" value="0">
@@ -233,6 +460,45 @@
             </parameterList>
         </parameterGroup>
     
+        <booleanParameter name="installInstance">
+            <insertAfter>user_data</insertAfter>
+            <description>${msg(install.para.inst.description)}</description>
+            <explanation>${msg(install.para.inst.explanation)}</explanation>
+            <value></value>
+            <default>true</default>
+            <cliOptionName>installInstance</cliOptionName>
+        </booleanParameter>
+        <stringParameter name="port">
+            <insertAfter>installInstance</insertAfter>
+            <cliOptionName>port</cliOptionName>
+            <title>${msg(install.para.inst.port.title)}</title>
+            <description>${msg(install.para.inst.port.description)}</description>
+            <explanation></explanation>
+            <value></value>
+            <default>3306</default>
+            <allowEmptyValue>1</allowEmptyValue>
+            <width>40</width>
+            <ruleList>
+                <isTrue value="${installInstance}" />
+            </ruleList>
+        </stringParameter>
+        <directoryParameter name="datadir">
+            <insertAfter>port</insertAfter>
+            <title>${msg(install.para.inst.datadir.title)}</title>
+            <description>${msg(install.para.inst.datadir.description)}</description>
+            <explanation></explanation>
+            <value></value>
+            <default>${installdir}/data${port}</default>
+            <allowEmptyValue>0</allowEmptyValue>
+            <ask>yes</ask>
+            <cliOptionName>datadir</cliOptionName>
+            <mustBeWritable>yes</mustBeWritable>
+            <mustExist>0</mustExist>
+            <width>40</width>
+            <ruleList>
+                <isTrue value="${installInstance}" />
+            </ruleList>
+        </directoryParameter>
     </parameterList>
     
     <readyToInstallActionList>  
@@ -394,13 +660,28 @@
                         <distributionDirectory>
                             <allowWildcards>1</allowWildcards>
                             <origin>${build_project_directory}/mysql/*</origin>
-                            <excludeFiles></excludeFiles>
+                            <excludeFiles>${build_project_directory}/mysql/my.cnf</excludeFiles>
                         </distributionDirectory>
                     </distributionFileList>
+                </folder>
+                <folder>
+                    <name>conf_files</name>
+                    <destination>${installdir}</destination>
+                    <distributionFileList>
+                        <distributionDirectory>
+                            <allowWildcards>1</allowWildcards>
+                            <origin>${build_project_directory}/mysql/*</origin>
+                            <includeFiles>*/my.cnf</includeFiles>
+                        </distributionDirectory>
+                    </distributionFileList>
+                    <ruleList>
+                        <fileTest condition="not_exists" path="${installdir}/my.cnf"/>
+                    </ruleList>
                 </folder>
             </folderList>
         </component>
     </componentList>
+
     
     <postInstallationActionList>
         <!--update installdir/support-files/mysql.server-->
@@ -411,10 +692,39 @@
                 <substitution pattern="/opt/sequoiasql/mysql" value="${installdir}"/>
             </substitutionList>
         </substitute>
-        
+        <substitute>
+            <files>${installdir}/bin/sequoiasql-mysql.sysv</files>
+            <type>exact</type>
+            <substitutionList>
+                <substitution pattern="/opt/sequoiasql/mysql" value="${installdir}"/>
+            </substitutionList>
+        </substitute>
+        <substitute>
+            <files>${installdir}/bin/sdb_mysql_ctl</files>
+            <type>exact</type>
+            <substitutionList>
+                <substitution pattern="XXXX" value="${username}"/>
+                <substitution pattern="/opt/sequoiasql/mysql" value="${installdir}"/>
+            </substitutionList>
+        </substitute>
+        <substitute>
+            <files>${installdir}/my.cnf</files>
+            <type>exact</type>
+            <substitutionList>
+                <substitution pattern="/opt/sequoiasql/mysql" value="${installdir}"/>
+            </substitutionList>
+        </substitute>
+        <removeFilesFromUninstaller files="${installdir}/my.cnf"/>
         <!--write /etc/default/sequoiasql-mysql-->
         <deleteFile path="${sys_conf_file}"/>
         <touchFile path="${sys_conf_file}"/>
+        <touchFile path="${installdir}/mysqld_multi.log"/>
+        <changeOwnerAndGroup>
+            <files>${installdir}/mysqld_multi.log</files>
+            <group>${groupname}</group>
+            <owner>${username}</owner>
+        </changeOwnerAndGroup>
+        <removeFilesFromUninstaller files="${installdir}/mysqld_multi.log"/>
         <setInstallerVariable name="md5_info_file" value="${installdir}/checksum.md5"/>
         <setInstallerVariable name="version_info_file" value="${installdir}/version.info"/>
         <deleteFile path="${md5_info_file}"/>
@@ -474,6 +784,77 @@
             <file>${version_info_file}</file>
             <text>${product_version}</text>
         </addTextToFile>
+        
+        <touchFile path="~${username}/.bashrc"/>
+        <runProgram>
+            <program>chown</program><!--<changeOwnerAndGroup> isnt effective for hidden files-->
+            <programArguments>-R ${username}:${groupname} ~${username}/.bashrc</programArguments>
+            <ruleList>
+                <fileExists path="~${username}/.bashrc"/>
+            </ruleList>
+        </runProgram>
+        <touchFile path="~${username}/.bash_profile">
+            <ruleEvaluationLogic>and</ruleEvaluationLogic>
+            <ruleList>
+                <fileExists path="~${username}/.bash_profile" negate="1"/>
+                <fileExists path="~${username}/.profile" negate="1"/>
+            </ruleList>
+        </touchFile>
+        <runProgram>
+            <program>chown</program><!--<changeOwnerAndGroup> isnt effective for hidden files-->
+            <programArguments>-R ${username}:${groupname} ~${username}/.bash_profile</programArguments>
+            <ruleList>
+                <fileExists path="~${username}/.bash_profile"/>
+            </ruleList>
+        </runProgram>
+        
+        <addEnv envFile="~${username}/.bashrc"/>
+        <addEnv envFile="~${username}/.bash_profile">
+            <ruleList>
+                <fileExists path="~${username}/.bash_profile"/>
+            </ruleList>
+        </addEnv>
+        <addEnv envFile="~${username}/.profile">
+            <ruleList>
+                <fileExists path="~${username}/.profile"/>
+            </ruleList>
+        </addEnv>
+        
+        <!--add and start service-->
+        <getSysType type="sys_type"/>
+        <if>
+            <conditionRuleList>
+                <compareValues value1="${sys_type}" logic="equals" value2="systemd"/>
+            </conditionRuleList>
+            <actionList>
+                <addSystemdService/>
+            </actionList>
+            <elseActionList>
+                <addDefaultService/>
+            </elseActionList>
+        </if>
+        <setInstallerVariable name="add_service_done" value="true">
+             <ruleList>
+                 <compareText logic="equals" text="${program_exit_code}" value="0"/>
+             </ruleList>
+        </setInstallerVariable>
+        <!--add instance-->
+        <setInstallerVariableFromScriptOutput>
+            <name>inst_num</name>
+            <exec>${installdir}/bin/sdblist</exec>
+            <execArgs>listinst | grep -v "Total" | wc -l</execArgs>
+        </setInstallerVariableFromScriptOutput>
+        <if>
+            <conditionRuleList>
+                <isTrue value="${installInstance}" />
+                <compareValues value1="${inst_num}" logic="less" value2="2"/>
+            </conditionRuleList>
+            <actionList>
+                <addDefaultInstance/>
+            </actionList>
+        </if>
+        <startServiceFunction/>
+        
     </postInstallationActionList>
 
     <installationAbortedActionList>
@@ -493,7 +874,46 @@
         </deleteGroup>
     </installationAbortedActionList>
     
+    <preUninstallationActionList>
+        <!--stop process-->
+        <runProgram>
+            <program>service</program>
+            <programArguments>sequoiasql-mysql stop</programArguments>
+            <abortOnError>0</abortOnError>
+            <showMessageOnError>0</showMessageOnError>
+        </runProgram>
 
+        <runProgram>
+            <program>${installdir}/bin/sdb_mysql_ctl</program>
+            <programArguments>stopall</programArguments>
+            <abortOnError>0</abortOnError>
+            <showMessageOnError>0</showMessageOnError>
+        </runProgram>
+        
+        <!--check process -->
+        
+    </preUninstallationActionList>
+
+    <postUninstallationActionList>
+        <!--remove service-->
+        <getSysType type="sys_type"/>
+        <if>
+            <conditionRuleList>
+                <compareValues value1="${sys_type}" logic="equals" value2="systemd"/>
+            </conditionRuleList>
+            <actionList>
+                <delSystemdService/>
+            </actionList>
+            <elseActionList>
+                <delDefaultService/>
+            </elseActionList>
+        </if>
+        <!--delete environment-->
+        <deleteEnv envFile="~${username}/.bashrc"/>
+        <deleteEnv envFile="~${username}/.profile"/>
+        <deleteEnv envFile="~${username}/.bash_profile"/>
+    </postUninstallationActionList>
+    
     <enableDebugger>1</enableDebugger>
     <enableRollback>1</enableRollback>
     <enableTimestamp>1</enableTimestamp>
@@ -505,4 +925,5 @@
     <vendor>SequoiaSQL-MySQL</vendor>
 
 </project>
+
 
