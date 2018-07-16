@@ -286,7 +286,7 @@
                    <customErrorMessage>${msg(install.errmsg.addinst)}</customErrorMessage>
                </runProgram>
            </actionList>
-        </actionDefinition>        
+        </actionDefinition>
    
    </functionDefinitionList>
 
@@ -841,7 +841,7 @@
         <!--add instance-->
         <setInstallerVariableFromScriptOutput>
             <name>inst_num</name>
-            <exec>${installdir}/bin/sdblist</exec>
+            <exec>${installdir}/bin/sdb_mysql_ctl</exec>
             <execArgs>listinst | grep -v "Total" | wc -l</execArgs>
         </setInstallerVariableFromScriptOutput>
         <if>
@@ -858,6 +858,7 @@
     </postInstallationActionList>
 
     <installationAbortedActionList>
+        <consoleWrite text="add inst error"/>
         <runProgram>
             <customErrorMessage>${msg(install.errmsg.deleteuser)}</customErrorMessage>
             <program>userdel</program>
