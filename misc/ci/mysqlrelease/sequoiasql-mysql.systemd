@@ -1,0 +1,16 @@
+# sequoiasql-mysql service file
+
+[Unit]
+Description=SequoiaSQL-MySQL Server
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+User=XXXX
+Environment="LD_LIBRARY_PATH=/opt/sequoiasql/mysql/lib"
+ExecStart=/opt/sequoiasql/mysql/bin/sdb_mysql_ctl startall
+ExecStop=/opt/sequoiasql/mysql/bin/sdb_mysql_ctl stopall
+
