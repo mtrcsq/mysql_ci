@@ -239,7 +239,7 @@ function change_configure()
    do
       i=$(($i+1))
       local mod=$(($i%2))
-      if [ $mod == 1 -a $i -gt 2 ]; then
+      if [ $mod == 1 -a $i -gt 2 -a "$arg" == "sequoiadb_conn_addr" ]; then
          sed -i 's/sequoiadb_conn_addr=.*/'$arg=${arr[$i]}'/g'   $INSTALL_DIR/my.cnf
       fi
    done
