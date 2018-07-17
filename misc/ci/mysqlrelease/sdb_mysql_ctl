@@ -43,7 +43,7 @@ function check_svcname_para()
 {
    if [ $INST_PORT -lt 1 -o $INST_PORT -gt 65535 ]; then
       echo "ERROR: svcname isn't in range ( 0, 65536 )"
-      exit 11
+      exit 9
    fi
 }
 
