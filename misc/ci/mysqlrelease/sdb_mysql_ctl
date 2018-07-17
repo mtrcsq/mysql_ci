@@ -1,0 +1,606 @@
+#!/bin/bash
+
+#   error code list:
+#   3     fail to initdb
+#   4     instance is running
+#   5     instance is not running
+#   6     instance exists
+#   7     instance does not exist
+#   8     can not find system configure file
+#   9     svcname isn't in range ( 0, 65536 )
+#   64    command line usage error
+#   77    permission denied
+
+export PATH=/opt/sequoiasql/mysql/bin:$PATH
+OPTION=""
+MYSQL_USER=XXXX
+SYS_CONF_FILE=""
+INST_NAME_LIST=""
+INST_START_STOP_TIMEOUT=60
+
+function lack_para()
+{
+   local para_name=$1
+   echo "sdb_mysql_ctl: no parameter \"$para_name\" specified" >&2
+   echo 'Try "sdb_mysql_ctl --help" for more information.'
+   exit 64
+}
+
+function check_num_para()
+{
+   local para_name=$1
+   local para_value=$2
+
+   local regex='^[0-9]+$'
+   if ! [[ "$para_value" =~ $regex ]]; then
+      echo "sdb_mysql_ctl: invalid value for parameter \"$para_name\": \"$para_value\"" >&2
+      echo 'Try "sdb_mysql_ctl --help" for more information.'
+      exit 64
+   fi
+}
+
+function check_svcname_para()
+{
+   if [ $INST_PORT -lt 1 -o $INST_PORT -gt 65535 ]; then
+      echo "ERROR: svcname isn't in range ( 0, 65536 )"
+      exit 11
+   fi
+}
+
+function check_opt_para()
+{
+   local para_value=$1
+   for opt in $para_value
+   do
+      case "$opt" in
+         -V | --version | '-?' | --help )
+            echo "sdb_mysql_ctl: parameter \"OPTIONS\" is forbidden to include \"$opt\"" >&2
+            echo 'Try "sdb_mysql_ctl --help" for more information.'
+            exit 64
+            ;;
+      esac
+   done
+}
+
+#The function will set global variable SYS_CONF_FILE
+function get_system_conf_file()
+{
+   local cur_install_dir=$INSTALL_DIR
+   local do_find_out=false
+
+   local file=`find /etc/default -name "sequoiasql-mysql"`
+   . $file
+   cd $INSTALL_DIR >> /dev/null 2>&1 && local sys_install_dir=`pwd` || sys_install_dir="$INSTALL_DIR"
+   cd $cur_path >> /dev/null >&1
+   if [ "$cur_install_dir" == "$sys_install_dir" ]
+   then
+      local do_find_out=true
+   fi
+
+   if [ $do_find_out == true ]
+   then
+      SYS_CONF_FILE=$file
+   else
+      echo "ERROR: No system configure file exist in /etc/default" >&2
+      exit 8
+   fi
+}
+
+function check_user()
+{
+   local operate_mode=$1
+
+   . $SYS_CONF_FILE
+   MYSQL_USER=$USER
+
+   local cur_user=`whoami`
+   if [ "$cur_user" != "$MYSQL_USER" -a "$cur_user" != "root" ]
+   then
+      echo "ERROR: sdb_mysql_ctl $operate_mode requires PGUSER [$MYSQL_USER] permission" >&2
+      exit 77
+   fi
+}
+
+function exec_cmd()
+{
+   local cmd="$1"
+   local cur_user=`whoami`
+   if [ $cur_user == "root" ]
+   then
+      su - $MYSQL_USER -c "export LD_LIBRARY_PATH=$INSTALL_DIR/lib;$cmd"
+      return $?
+   else
+      eval "${cmd}"
+      return $?
+   fi
+}
+
+#check instance exists or not
+function check_inst_exist()
+{
+   local inst_port=$1
+   local inst_name=mysqld$1
+   local exp_exist=$2
+   local act_exist=false
+   local ret=`$INSTALL_DIR/bin/mysqld_multi --defaults-file=$INSTALL_DIR/my.cnf report $inst_port`
+   if [[ $ret =~ $inst_name ]]
+   then
+      act_exist=true
+   fi
+   
+   if [ $exp_exist == false -a $act_exist == true ]
+   then
+      echo "ERROR: instance $inst_name already exists" >&2
+      return 6
+   fi
+   if [ $exp_exist == true -a $act_exist == false ]; then
+      echo "ERROR: instance $inst_name does not exist" >&2
+      return 7
+   fi
+}
+
+function parse_server_arguments() {
+   for arg do
+      case "$arg" in
+         --basedir=*)   basedir=`echo "$arg" | sed -e 's/^[^=]*=//'`
+            ;;
+         --datadir=*)   datadir=`echo "$arg" | sed -e 's/^[^=]*=//'`
+            ;;
+         --port=*)      port=`echo "$arg" | sed -e 's/^[^=]*=//'`
+            ;;
+         --log_error=*) log_error=`echo "$arg" | sed -e 's/^[^=]*=//'`;;
+      esac
+   done
+   printf "%-15s %-10s  %-45s %-45s\n" "mysqld"$port $port $datadir $log_error
+}
+
+function get_instnames()
+{
+   local i=0
+   for line in `cat $INSTALL_DIR/my.cnf`
+   do
+      if [[ $line =~ ^\s*\[\s*(mysqld)([0-9]+)\s*\]\s*$ ]]
+      then
+         b=`echo $line | grep "mysqld[0-9]\+" -o`
+         INST_NAME_LIST[i]=$b
+         i=$(($i+1))
+      fi
+   done
+}
+
+function list_inst()
+{
+   printf "%-10s %-15s %-40s %-40s\n" "NAME" "PORT" "DATADIR" "LOGFILE"
+   get_instnames
+   local i=0
+   for inst in ${INST_NAME_LIST[@]}
+   do
+      parse_server_arguments `$INSTALL_DIR/bin/my_print_defaults --defaults-file=$INSTALL_DIR/my.cnf ${inst}`
+      i=$(($i+1))
+   done
+   printf "Total: %s\n" $i
+}
+
+function add_inst()
+{
+   #check argument
+   if [ ! -z $INST_PORT ]; then
+      check_svcname_para
+   fi
+   check_inst_exist $INST_PORT false
+   if [ $? != 0 ]; then
+      exit 6
+   fi
+   echo "Adding instance mysqld$INST_PORT, port is $INST_PORT ..."
+   #init database
+   exec_cmd "$INSTALL_DIR/bin/mysqld --no-defaults --basedir=$INSTALL_DIR --datadir=$MYSQL_DATA --user=$MYSQL_USER --log_error=$MYSQL_LOGFILE --initialize-insecure"
+   if [ $? != 0 ]; then
+      echo "ERROR: init instance failed!" >&2
+      exit 3
+   fi
+   #write $INSTALL_DIR/my.cnf
+   sed -i '$a\[mysqld'$INST_PORT']'                  $INSTALL_DIR/my.cnf
+   sed -i '$a\port='$INST_PORT''                     $INSTALL_DIR/my.cnf
+   sed -i '$a\basedir='$INSTALL_DIR''                $INSTALL_DIR/my.cnf
+   sed -i '$a\datadir='$MYSQL_DATA''                 $INSTALL_DIR/my.cnf
+   sed -i '$a\pid-file='$MYSQL_PIDFILE''             $INSTALL_DIR/my.cnf
+   sed -i '$a\log_error='$MYSQL_LOGFILE''            $INSTALL_DIR/my.cnf
+   sed -i '$a\socket='$MYSQL_SOCKET''                $INSTALL_DIR/my.cnf
+   sed -i '$a\user='$MYSQL_USER''                    $INSTALL_DIR/my.cnf
+   sed -i '$a\default-storage-engine=SequoiaDB'      $INSTALL_DIR/my.cnf
+   sed -i '$a\sequoiadb_use_partition=ON'            $INSTALL_DIR/my.cnf
+   sed -i '$a\character_set_server=utf8mb4'          $INSTALL_DIR/my.cnf
+   sed -i '$a\sequoiadb_conn_addr=localhost:11810'   $INSTALL_DIR/my.cnf
+   
+   #start instance
+   start_inst $INST_PORT >> /dev/null
+   if [ $? == 5 ]; then
+      exit 5
+   fi
+   echo "ok"
+
+}
+
+function change_configure()
+{
+   local args=$*
+   #check instance exists or not
+   check_inst_exist $INST_PORT true >> /dev/null
+   if [ $? == 7 ]; then
+      exit 7
+   fi
+   echo "Changing configure of instance mysqld$INST_PORT ..."
+   OLD_IFS="$IFS"
+   IFS=" "
+   arr=($args)
+   IFS="$OLD_IFS"
+   local i=0
+   for arg in ${arr[@]}
+   do
+      i=$(($i+1))
+      local mod=$(($i%2))
+      if [ $mod == 1 -a $i -gt 2 ]; then
+         sed -i 's/sequoiadb_conn_addr=.*/'$arg=${arr[$i]}'/g'   $INSTALL_DIR/my.cnf
+      fi
+   done
+   restart_inst $INST_PORT >> /dev/null
+   echo "ok"
+}
+
+function delete_inst()
+{
+   local INST_PORT=$1
+   check_inst_exist $INST_PORT true 
+   if [ $? == 7 ]; then 
+      exit 7
+   fi
+   echo "Deleting instance mysqld$INST_PORT, port is $INST_PORT ..."
+
+   #stop instance
+   stop_inst $INST_PORT >> /dev/null
+   if [ $? == 4 ]
+   then
+      exit 4
+   fi
+   local ret=`$INSTALL_DIR/bin/my_print_defaults --defaults-file=$INSTALL_DIR/my.cnf mysqld$INST_PORT`
+   local datadir=""
+   for arg in $ret
+   do
+      case "$arg" in
+         --datadir=*)   datadir=`echo "$arg" | sed -e 's/^[^=]*=//'`
+            ;;
+      esac
+   done
+   #delete datadir
+   exec_cmd "rm -rf $datadir"
+   get_instnames
+   #add tag section_name under [mysqld_multi]
+   exec_cmd "sed -i '/^\s*\[\s*mysqld_multi\s*\]\s*$/a\section_name=[mysqld_multi]' $INSTALL_DIR/my.cnf"
+   local reserved_inst=""
+   for inst in ${INST_NAME_LIST[@]}
+   do
+      if [ $inst != "mysqld"$INST_PORT ]
+      then
+         #add tag section_name under [mysqldN]
+         exec_cmd "sed -i '/^\s*\[\s*$inst\s*\]\s*$/a\section_name=[$inst]' $INSTALL_DIR/my.cnf"
+         reserved_inst=$reserved_inst" "$inst
+      fi
+   done
+   #update my.cnf
+   exec_cmd "$INSTALL_DIR/bin/my_print_defaults --defaults-file=$INSTALL_DIR/my.cnf mysqld_multi $reserved_inst > $INSTALL_DIR/my_cnf"
+   sed -i 's/^--section_name=//' $INSTALL_DIR/my_cnf
+   sed -i 's/^--//' $INSTALL_DIR/my_cnf
+   exec_cmd "cp $INSTALL_DIR/my_cnf $INSTALL_DIR/my.cnf"
+   exec_cmd "rm -rf $INSTALL_DIR/my_cnf"
+   echo "ok"
+}
+
+function get_one_status()
+{
+   local INST_PORT=$1
+   local ret=`$INSTALL_DIR/bin/mysqld_multi --defaults-file=$INSTALL_DIR/my.cnf report $INST_PORT`
+   if [[ $ret =~ "is running" ]]
+   then
+      echo "mysqld$INST_PORT is running"
+      return 4
+   else
+      echo "mysqld$INST_PORT is not running"
+      return 5
+   fi
+}
+
+function get_status()
+{
+   local inst_port=$1
+   OLD_IFS="$IFS"
+   IFS=","
+   arr=($inst_port)
+   IFS="$OLD_IFS"
+   for port in ${arr[@]}
+   do
+      total_cnt=$(($total_cnt+1))
+      check_inst_exist $port true
+      if [ $? == 7 ]; then 
+         continue
+      fi
+      get_one_status $port
+   done
+}
+
+function wait_for_pid()
+{
+   local inst_port=$1
+   local exp_exist=$2
+   if [ $exp_exist == 'true' ];then
+      
+      for ((i=0;i<$INST_START_STOP_TIMEOUT;i++));
+      do
+         get_one_status $inst_port >> /dev/null
+         if [ $? == 4 ];then
+            return 4
+         fi
+         sleep 1
+      done
+      return 5
+   fi
+   if [ $exp_exist == 'false' ];then
+      for ((i=0;i<$INST_START_STOP_TIMEOUT;i++));
+      do
+         get_one_status $inst_port >> /dev/null
+         if [ $? == 5 ];then
+            return 5
+         fi
+         sleep 1
+      done
+      return 4
+   fi
+}
+
+function start_inst()
+{
+   local inst_port=$1
+   local total_cnt=0
+   local succ_cnt=0
+   local fail_cnt=0
+   OLD_IFS="$IFS"
+   IFS=","
+   arr=($inst_port)
+   IFS="$OLD_IFS"
+   for port in ${arr[@]}
+   do
+      total_cnt=$(($total_cnt+1))
+      check_inst_exist $port true
+      if [ $? == 7 ]; then 
+         fail_cnt=$(($fail_cnt+1))
+         continue
+      fi
+      get_one_status $port >> /dev/null
+      if [ $? == 4 ]; then
+         echo "mysqld$INST_PORT is already running"
+         succ_cnt=$(($succ_cnt+1))
+         continue
+      fi
+      exec_cmd "$INSTALL_DIR/bin/mysqld_multi --defaults-file=$INSTALL_DIR/my.cnf start $port >> /dev/null 2>&1"
+      wait_for_pid $port true >> /dev/null
+      if [ $? != 4 ]; then
+         echo "ERROR: Fail to start" >&2
+         fail_cnt=$(($fail_cnt+1))
+      else
+         succ_cnt=$(($succ_cnt+1))
+      fi
+   done
+   echo "Start total: $total_cnt; Succeed: $succ_cnt; Failed: $fail_cnt"
+   test $total_cnt != $succ_cnt && return 5
+   return 0
+}
+
+function start_all()
+{
+   #local inst_list=`list_inst | awk 'NR>2{print p}{p=$2}' | grep -vx PORT`
+   exec_cmd "$INSTALL_DIR/bin/mysqld_multi --defaults-file=$INSTALL_DIR/my.cnf start"
+    if [ $? != 0 ]; then
+       echo "ERROR: Fail to start all instance" >&2
+       exit 4
+    fi
+   return 0
+}
+
+function stop_inst()
+{
+   local inst_port=$1
+   local total_cnt=0
+   local succ_cnt=0
+   local fail_cnt=0
+   OLD_IFS="$IFS"
+   IFS=","
+   arr=($inst_port)
+   IFS="$OLD_IFS"
+   for port in ${arr[@]}
+   do
+      total_cnt=$(($total_cnt+1))
+      check_inst_exist $port true
+      if [ $? == 7 ]; then 
+         fail_cnt=$(($fail_cnt+1))
+         continue
+      fi
+      get_one_status $port >> /dev/null
+      if [ $? == 5 ]; then
+         echo "mysqld$INST_PORT is not already running"
+         succ_cnt=$(($succ_cnt+1))
+         continue
+      fi
+      exec_cmd "$INSTALL_DIR/bin/mysqld_multi --defaults-file=$INSTALL_DIR/my.cnf stop $port"
+      wait_for_pid $port false 
+      if [ $? != 5 ]; then
+         echo "ERROR: Fail to stop" >&2
+         fail_cnt=$(($fail_cnt+1))
+      else
+         succ_cnt=$(($succ_cnt+1))
+      fi
+   done
+   echo "Stop total: $total_cnt; Succeed: $succ_cnt; Failed: $fail_cnt"
+   test $total_cnt != $succ_cnt && return 4
+   return 0
+}
+
+function stop_all()
+{
+   exec_cmd "$INSTALL_DIR/bin/mysqld_multi --defaults-file=$INSTALL_DIR/my.cnf stop"
+    if [ $? != 0 ]; then
+       echo "ERROR: Fail to stop all instance" >&2
+       exit 4
+    fi
+    return 0
+}
+
+function restart_inst()
+{
+   local inst_port=$1
+   stop_inst $inst_port
+   sleep 1
+   start_inst $inst_port
+}
+
+function build_help()
+{
+   echo "sdb_mysql_ctl is a utility to initialize, start, stop, or control a SequoiaSQL server."
+   echo ""
+   echo "Usage:"
+   echo "  sdb_mysql_ctl listinst"
+   echo "  sdb_mysql_ctl addinst    <PORT> [-o \"OPTIONS\"]"
+   echo "  sdb_mysql_ctl delinst    <PORT>"
+   echo "  sdb_mysql_ctl start      <PORT>"
+   echo "  sdb_mysql_ctl startall"
+   echo "  sdb_mysql_ctl stop       <PORT>"
+   echo "  sdb_mysql_ctl stopall"
+   echo "  sdb_mysql_ctl restart    <PORT>"
+   echo "  sdb_mysql_ctl status     <PORT>"
+   echo "  sdb_mysql_ctl config     <PORT> [-c \"CONFIGURES\"]"
+   echo ""
+   echo "OPTIONS:"
+   echo "  -d datadir             location of the database storage area"
+   echo "  -l log_error           write server log to LOGFILE"
+   echo "  -f pid-file            location of the pid file"
+   echo "  -s socket              socket file between client and server"
+}
+
+function init_inst_conf()
+{
+   test -z $DEFINE_MYSQLDATA && MYSQL_DATA=$INSTALL_DIR/data$INST_PORT
+   test -z $DEFINE_LOGFILE && MYSQL_LOGFILE=$MYSQL_DATA/error.log
+   test -z $DEFINE_PIDFILE && MYSQL_PIDFILE=$MYSQL_DATA/mysqld.pid
+   test -z $DEFINE_SOCKET && MYSQL_SOCKET=$MYSQL_DATA/mysqld.sock
+}
+
+#Parse command line parameters
+test $# -eq 0 && { build_help && exit 64; }
+
+ARGS=`getopt -o hd:l:f:s: --long "help" -n 'sdb_mysql_ctl' -- "$@"`
+ret=$?
+test $ret -ne 0 && exit $ret
+
+eval set -- "${ARGS}"
+
+while true
+do
+   case "$1" in
+      -d )             DEFINE_MYSQLDATA=true
+                       MYSQL_DATA=$2
+                       shift 2
+                       ;;
+      -l )             DEFINE_LOGFILE=true
+                       MYSQL_LOGFILE=$2
+                       shift 2
+                       ;;
+      -f )             DEFINE_PIDFILE=true
+                       MYSQL_PIDFILE=$2
+                       shift 2
+                       ;;
+      -s )             DEFINE_SOCKET=true
+                       MYSQL_SOCKET=$2
+                       shift 2
+                       ;;
+      -h | --help )    build_help
+                       exit 0
+                       ;;
+      --)              shift
+                       break
+                       ;;
+      *)               echo "Internal error!"
+                       exit 64
+                       ;;
+   esac
+done
+
+#get path
+dir_name=`dirname $0`
+if [[ ${dir_name:0:1} != "/" ]]; then
+   BIN_PATH=$(pwd)/$dir_name  #relative path
+else
+   BIN_PATH=$dir_name         #absolute path
+fi
+
+cur_path=`pwd`
+cd $BIN_PATH/../ && INSTALL_DIR=`pwd`
+
+#process other argument
+case "$1" in
+   listinst)   mode=$1; shift 1;;
+   addinst)    test -z $2 && lack_para "PORT" || INST_PORT=$2
+               init_inst_conf
+               mode=$1; shift 2;;
+   delinst)    test -z $2 && lack_para "PORT" || INST_PORT=$2
+               mode=$1; shift 2;;
+   status)     mode=$1
+               test -z $2 && shift 1 || { INST_PORT=$2 && shift 2; }
+               ;;
+   start)      test -z $2 && lack_para "PORT" || INST_PORT=$2
+               mode=$1; shift 2;;
+   startall)   mode=$1; shift 1;;
+   stop)       test -z $2 && lack_para "PORT" || INST_PORT=$2
+               mode=$1; shift 2;;
+   stopall)    mode=$1; shift 1;;
+   restart)    test -z $2 && lack_para "PORT" || INST_PORT=$2
+               mode=$1; shift 2;;
+   config)     test -z $2 && lack_para "PORT" || INST_PORT=$2 CONS=$*
+               mode=$1; shift 2;;
+esac
+
+if [ "$*" != "" -a $mode != "config" ]; then
+   echo "sdb_mysql_ctl: too many arguments: $*" >&2
+   echo 'Try "sdb_mysql_ctl --help" for more information.'
+   exit 64
+fi
+if [ "$CONS" == "config $INST_PORT" -a $mode == "config" ]; then
+   echo "sdb_mysql_ctl: config no arguments" >&2
+   echo 'Try "sdb_mysql_ctl --help" for more information.'
+   exit 64
+fi
+
+##################################
+#    main entry
+##################################
+
+cd $cur_path >> /dev/null >&1
+
+#check user
+get_system_conf_file
+check_user $mode
+
+#enter operation mode
+case $mode in
+   listinst)      list_inst                               ;;
+   addinst)       add_inst         $INST_PORT             ;;
+   delinst)       delete_inst      $INST_PORT             ;;
+   status)        get_status       $INST_PORT             ;;
+   start)         start_inst       $INST_PORT || exit $?  ;;
+   startall)      start_all                           ;;
+   stop)          stop_inst        $INST_PORT || exit $?  ;;
+   stopall)       stop_all                                ;;
+   restart)       restart_inst     $INST_PORT || exit $?  ;;
+   config)        change_configure $CONS            ;;
+esac
+
+exit 0
+
+
