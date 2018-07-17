@@ -9,7 +9,12 @@ install.para.licenseread.read.description=Read The License
 install.para.licenseread.agree.description=Agree The License
 install.para.licenseread.agree.explanation=For More License's Detail, Please Check The License File After Installation
 install.para.licenseread.license.information.part=GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\nCopyright (C) 1989, 1991 Free Software Foundation, Inc.,\n51 Franklin\nStreet, Fifth Floor, Boston, MA 02110-1301 USA\nEveryone is permitted to copy and distribute verbatim copies\nof this license document, but changing it is not allowed.
-
+install.para.inst.description=add inst
+install.para.inst.explanation=Do You Want To Add default instance?
+install.para.inst.port.title=set instance port
+install.para.inst.datadir.title=set instance data dir
+install.para.inst.port.description=instance port
+install.para.inst.datadir.description=instance data dir
 
 install.show.checkinstalldir.text=An existing installation has been detected in ${installdir}. please uninstall the previous version before install!\n 
 
@@ -20,4 +25,11 @@ install.errmsg.creategroup=Failed to create group ${groupname}.
 install.errmsg.createuser=Failed to create user ${username}.
 install.errmsg.deleteuser=Failed to delete user ${username}.
 install.errmsg.checkdisk=There is not enough disk space for installation, it needs 1G.
+install.errmsg.systemctlreload=Fail to excute 'systemctl daemon-reload'.
+install.errmsg.startservice=Fail to start service ${service_name}.
+install.errmsg.addservice=Fail to add service ${service_name}.
+install.errmsg.addinst=Fail to add inst.
+
+
+
 
