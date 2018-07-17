@@ -1,0 +1,41 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:             sequoiasql-mysql
+# Required-Start:       $remote_fs $syslog
+# Required-Stop:        $remote_fs $syslog
+# Default-Start:        2 3 4 5
+# Default-Stop:         0 1 6
+# Short-Description:    start|stop|report|restart instance
+### END INIT INFO
+
+export PATH=/opt/sequoiasql/mysql/bin:$PATH
+basedir=/opt/sequoiasql/mysql
+bindir=/opt/sequoiasql/mysql/bin
+
+if test -x $bindir/mysqld_multi
+then
+  mysqld_multi="$bindir/mysqld_multi";
+else
+  echo "Can't execute $bindir/mysqld_multi from dir $basedir";
+  exit;
+fi
+
+case "$1" in
+    'start' )
+        "$mysqld_multi" --defaults-file=$basedir/my.cnf start $2
+        ;;
+    'stop' )
+        "$mysqld_multi" --defaults-file=$basedir/my.cnf stop $2
+        ;;
+    'report' )
+        "$mysqld_multi" --defaults-file=$basedir/my.cnf report $2
+        ;;
+    'restart' )
+        "$mysqld_multi" --defaults-file=$basedir/my.cnf stop $2
+        "$mysqld_multi" --defaults-file=$basedir/my.cnf start $2
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|report|restart}" >&2
+        ;;
+esac
+
