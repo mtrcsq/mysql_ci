@@ -30,44 +30,52 @@
             request="START SHELL COMMAND chmod u+x ${CI_WORK_DIR}/${package_name} WAIT 10m RETURNSTDOUT RETURNSTDERR" 
             throwBuildException="1"/>
       <staf location="local" service="PROCESS" 
-            request="START SHELL COMMAND ${CI_WORK_DIR}/${package_name} --mode unattended WAIT 10m STDERRTOSTDOUT RETURNSTDOUT" 
-			resultPrefix="install"
+            request="START SHELL COMMAND ${CI_WORK_DIR}/${package_name} --mode unattended --installInstance false  WAIT 10m STDERRTOSTDOUT RETURNSTDOUT" 
+            resultPrefix="install"
             throwBuildException="1"/>
-	  <propertyregex property="install_rc" input="${install.result}" regexp="Return\ Code:\ (.*)\n" select="\1"/>
-	  <if>
-	     <equals arg1="${install_rc}" arg2="0"/>
-		 <else>
-		    <fail message="exex: ${CI_WORK_DIR}/${package_name} --mode unattended, return code is not 0"/>
-		 </else>
-	  </if>
+      <propertyregex property="install_rc" input="${install.result}" regexp="Return\ Code:\ (.*)\n" select="\1"/>
+      <if>
+         <equals arg1="${install_rc}" arg2="0"/>
+         <else>
+            <fail message="exex: ${CI_WORK_DIR}/${package_name} --mode unattended, return code is not 0"/>
+         </else>
+      </if>
    </target>
-	
+
    <target name="ready_testcase">
       <hostinfo prefix="host"/>
-	  <staf location="local" service="FS"
-	        request="DELETE ENTRY ${INSTALL_DIR}/mysql-test/t RECURSE CONFIRM" 
-			throwBuildException=""/>
+      <staf location="local" service="FS"
+            request="DELETE ENTRY ${INSTALL_DIR}/mysql-test/t RECURSE CONFIRM" 
+            throwBuildException=""/>
       <staf location="local" service="FS" 
-	        request="COPY DIRECTORY ${WORKSPACE}/r TODIRECTORY ${INSTALL_DIR}/}/mysql-test/r TOMACHINE ${host.NAME} RECURSE"
-			throwBuildException="1"/>
+            request="COPY DIRECTORY ${WORKSPACE}/r TODIRECTORY ${INSTALL_DIR}/mysql-test/r TOMACHINE ${host.NAME} RECURSE"
+            throwBuildException="1"/>
       <staf location="local" service="FS" 
-	        request="COPY DIRECTORY ${WORKSPACE}/t TODIRECTORY ${INSTALL_DIR}/}/mysql-test/t TOMACHINE ${host.NAME} RECURSE"
-			throwBuildException="1"/>
+            request="COPY DIRECTORY ${WORKSPACE}/t TODIRECTORY ${INSTALL_DIR}/mysql-test/t TOMACHINE ${host.NAME} RECURSE"
+            throwBuildException="1"/>
       <staf location="local" service="FS" 
-	        request="COPY DIRECTORY ${WORKSPACE}/include TODIRECTORY ${INSTALL_DIR}/}/mysql-test/include TOMACHINE ${host.NAME} RECURSE"
-			throwBuildException="1"/>
+            request="COPY DIRECTORY ${WORKSPACE}/include TODIRECTORY ${INSTALL_DIR}/mysql-test/include TOMACHINE ${host.NAME} RECURSE"
+            throwBuildException="1"/>
+            
+      <staf location="local" service="PROCESS" 
+            request="START SHELL COMMAND chown sdbadmin:sdbadmin_group ${INSTALL_DIR}/mysql-test -R WAIT 10m STDERRTOSTDOUT RETURNSTDOUT" 
+            resultPrefix="install"
+            throwBuildException="1"/>
    </target>
-	
+ 
    <target name="exec_testcase">
       <var name="testscript_log" value="${CI_WORK_DIR}/normal_test.log"/>
-	  <staf location="local" service="FS" 
-	        request="DELETE ENTRY ${testscript_log} CONFIRM"/>
-      <var name="cmd" value="cd ${INSTALL_DIR}/mysql-test;./mtr --suite=${TESTCASE_LIST} --big-test --nocheck-testcases --force --xml-report=${WORKSPACE}/report/mysql_test_report.xml --parallel=4"/>
+      <staf location="local" service="FS" 
+            request="DELETE ENTRY ${testscript_log} CONFIRM"/>
+      <var name="cmd" value="cd ${INSTALL_DIR}/mysql-test;su sdbadmin -c './mtr --suite=${TESTCASE_LIST} --big-test  --force --xml-report=/opt/sequoiasql/mysql/mysql_test_report.xml'"/>
       <staf location="local" service="PROCESS" 
             request="START SHELL COMMAND ${cmd} STDOUTAPPEND ${testscript_log} STDERRTOSTDOUT WAIT" 
             throwBuildException="1"/>
       <staf location="local" service="FS" 
             request="GET FILE ${testscript_log} TEXT" 
+            throwBuildException="1"/>
+      <staf location="local" service="FS" 
+            request="COPY FILE /opt/sequoiasql/mysql/mysql_test_report.xml TODIRECTORY ${WORKSPACE}/report TOMACHINE ${host.NAME} RECURSE"
             throwBuildException="1"/>
    </target>
 
@@ -76,7 +84,7 @@
       <first id="package_fullname">
          <fileset dir="${package_dir}" includes="sequoiasql-mysql*.run"/>
       </first>
-	  <property name="package_fullname" location="${toString:package_fullname}"/>
+      <property name="package_fullname" location="${toString:package_fullname}"/>
       <basename property="package_name_part" file="${package_fullname}" suffix=".run"/>
       <property name="package_name" value="${package_name_part}.run"/>
 
